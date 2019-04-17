@@ -5,11 +5,17 @@ observation = env.reset()
 
 
 # GLOBAL VARIABLES
+# EPSILON = 0.99
+# ALPHA = 0.001
+# DISCOUNT = 0.99
 EPSILON = 0.1
 ALPHA = 0.3
 DISCOUNT = 0.7
 
 TESTING_EPISODE = 4900
+TOTAL_EPISODES = 5000
+EPISODE_TIME_LIMIT = 1000
+TESTING_SCORES = []
 
 QVALUES = {}
 
@@ -66,13 +72,14 @@ def getAction(state):
 
 # MAIN
 
-for episode in range(5000):
+for episode in range(TOTAL_EPISODES):
     state = env.reset()
     lastState = None
     lastAction = None
-    
 
-    for t in range(1000):
+    currentScore = 0
+    
+    for t in range(EPISODE_TIME_LIMIT):
         # env.render()
 
         if episode > TESTING_EPISODE:
@@ -94,6 +101,8 @@ for episode in range(5000):
 
         # print(action)
 
+        currentScore += reward
+
         update(lastState, lastAction, state, reward)
 
         # print(QVALUES.values())
@@ -101,11 +110,15 @@ for episode in range(5000):
 
         if done:
             # print("Episode finished after {} timesteps".format(t+1))
+            print("Episode {} finished after {} timesteps. Score: {}".format(episode, t+1, currentScore))
             break
 
     if episode == TESTING_EPISODE:
         print('ENTERED TESTING MODE')
         EPSILON = 0
         ALPHA = 0
+    elif episode > TESTING_EPISODE:
+        print('Testing episode finished with score: ' + str(currentScore))
+        TESTING_SCORES.append(currentScore)
 
-
+print('Average score over testing episodes: ' + str(mean(TESTING_SCORES)))
