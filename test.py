@@ -9,7 +9,7 @@ EPSILON = 0.1
 ALPHA = 0.3
 DISCOUNT = 0.7
 
-TESTING_EPISODE = 4900
+TESTING_EPISODE = 0
 
 QVALUES = {}
 
@@ -75,6 +75,7 @@ for episode in range(5000):
             # Pick random action for first step
             action = env.action_space.sample()
         else:
+            print(state[1])
             action = getAction(state)
 
         lastState = state
