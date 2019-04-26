@@ -1,6 +1,9 @@
 import gym
 import random
 import numpy as np
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
 env = gym.make('LunarLander-v2')
 observation = env.reset()
 
@@ -12,10 +15,14 @@ EPSILON = 0.9995
 EDECAY = 0.99941
 ALPHA = 0.001
 DISCOUNT = 0.9995
-SUPERVISED_EPISODE = 2
+SUPERVISED_EPISODE = 3
+SUPERVISED_ON = True
 
 EXPERIMENTS = {}
-EXPERIMENTS['2 Supervised'] = ({'EP': 0.9995, 'ED':0.99941, 'AL':0.001, 'DI':0.9995, 'SU':2})
+
+EXPERIMENTS['Supervised Every 1'] = ({'EP': 0.9999, 'ED':0.9991, 'AL':0.001, 'DI':0.995, 'SU':1})
+# EXPERIMENTS['Discount 0.995'] = ({'EP': 0.9995, 'ED':0.99941, 'AL':0.001, 'DI':0.995, 'SU':2})
+# EXPERIMENTS['E-decay 0.99973'] = ({'EP': 0.9999, 'ED':0.99973, 'AL':0.001, 'DI':0.9995, 'SU':2})
 
 TESTING_EPISODE = 5000
 TOTAL_EPISODES = 5500
@@ -35,10 +42,7 @@ def computeValueFromQValues(state):
     for action in range(4):
         qValues.append(getQValue(state, action))
 
-    bad = max(qValues)
-    # print(bad)
-
-    return bad
+    return max(qValues)
 
 # Given a state, round the values inside to nearest whole number
 def roundState(state):
@@ -58,13 +62,7 @@ def update(state, action, nextState, reward):
         if f not in WEIGHTS:
             WEIGHTS[f] = 0
 
-        # if f == 'XVelocity':
-        #     print("alphaTimesDifference " + str(alphaTimesDifference))
-        #     print("features[f] " + str(features[f]))
-        #     print()
-
         WEIGHTS[f] += alphaTimesDifference * features[f]
-    # print(WEIGHTS)
 
 def extractFeatures(state, action):
     features = {}
@@ -72,24 +70,24 @@ def extractFeatures(state, action):
     # features['XPos'] = state[0]
     # features['YPos'] = state[1]
 
-    features['XPos0'] = state[0] if action == 0 else 0
-    features['XPos1'] = state[0] if action == 1 else 0
-    features['XPos2'] = state[0] if action == 2 else 0
-    features['XPos3'] = state[0] if action == 3 else 0
+    # features['XPos0'] = state[0] if action == 0 else 0
+    # features['XPos1'] = state[0] if action == 1 else 0
+    # features['XPos2'] = state[0] if action == 2 else 0
+    # features['XPos3'] = state[0] if action == 3 else 0
 
-    features['YPos0'] = state[1] if action == 0 else 0
-    features['YPos1'] = state[1] if action == 1 else 0
-    features['YPos2'] = state[1] if action == 2 else 0
-    features['YPos3'] = state[1] if action == 3 else 0
+    # features['YPos0'] = state[1] if action == 0 else 0
+    # features['YPos1'] = state[1] if action == 1 else 0
+    # features['YPos2'] = state[1] if action == 2 else 0
+    # features['YPos3'] = state[1] if action == 3 else 0
 
     # CUSTOM
     #features['DistanceFromCenter'] = ((state[0] ** 2) + (state[1] ** 2)) ** 0.5
 
-    # distFromCenter = ((state[0] ** 2) + (state[1] ** 2)) ** 0.5
-    # features['DistanceFromCenter0'] = distFromCenter if action == 0 else 0
-    # features['DistanceFromCenter1'] = distFromCenter if action == 1 else 0
-    # features['DistanceFromCenter2'] = distFromCenter if action == 2 else 0
-    # features['DistanceFromCenter3'] = distFromCenter if action == 3 else 0
+    distFromCenter = ((state[0] ** 2) + (state[1] ** 2)) ** 0.5
+    features['DistanceFromCenter0'] = distFromCenter if action == 0 else 0
+    features['DistanceFromCenter1'] = distFromCenter if action == 1 else 0
+    features['DistanceFromCenter2'] = distFromCenter if action == 2 else 0
+    features['DistanceFromCenter3'] = distFromCenter if action == 3 else 0
 
     # features['XVelocity'] = state[2]
     # features['YVelocity'] = state[3]
@@ -152,13 +150,9 @@ def extractFeatures(state, action):
 def getQValue(state, action):
     features = extractFeatures(state, action)
 
+    result = sum(WEIGHTS[key] * features.get(key, 0) for key in WEIGHTS)
 
-    bad = sum(WEIGHTS[key] * features.get(key, 0) for key in WEIGHTS)
-    # print(bad)
-
-    return bad
-
-
+    return result
 
 # Given an observation, decide an action based on highest QValue
 # Action is a discrete number between [0, 3]
@@ -206,26 +200,19 @@ def heuristic(env, s):
     elif angle_todo < -0.05: a = 3
     elif angle_todo > +0.05: a = 1
 
-    # if env.continuous:
-    #     a = np.array( [hover_todo*20 - 1, -angle_todo*20] )
-    #     a = np.clip(a, -1, +1)
-    # else:
-    #     a = 0
-    #     if hover_todo > np.abs(angle_todo) and hover_todo > 0.05: a = 2
-    #     elif angle_todo < -0.05: a = 3
-    #     elif angle_todo > +0.05: a = 1
-
     return a
 
 # MAIN
 # Returns a Pandas DataFrame
 def main():
 
-    experiment_results = []
-    experiment_results.append()
+    global EPSILON, EDECAY, ALPHA, DISCOUNT, SUPERVISED_EPISODE, QVALUES, WEIGHTS
 
-    average_episode_frame = 500
-    cumulative_score = 0
+    experimentAverage = []
+    experimentResults = []
+
+    episodeFrame = []
+    episodeQuantity = 0
 
     for episode in range(TOTAL_EPISODES):
         state = env.reset()
@@ -238,6 +225,8 @@ def main():
             # print(WEIGHTS)
 
         currentScore = 0
+        # currentScore = []
+        currentQuantity = 0
         
         for t in range(EPISODE_TIME_LIMIT):
             # env.render()
@@ -245,10 +234,10 @@ def main():
             # if episode > TESTING_EPISODE or episode % SUPERVISED_EPISODE == 0: # or episode % 100 == 0:
                 # env.render()
 
-            if episode > TESTING_EPISODE:
-                env.render()
+            # if episode > TESTING_EPISODE:
+            #     env.render()
 
-            if episode % SUPERVISED_EPISODE == 0 and episode < TESTING_EPISODE:
+            if episode % SUPERVISED_EPISODE == 0 and episode < TESTING_EPISODE and SUPERVISED_ON:
                 action = heuristic(env, state)
             else:
                 if t == 0:
@@ -262,6 +251,7 @@ def main():
 
             state, reward, done, info = env.step(action)
             # print(reward)
+
             currentScore += reward
 
             update(lastState, lastAction, state, reward)
@@ -270,9 +260,22 @@ def main():
 
             if done:
                 # print("Episode {} finished after {} timesteps. Score: {}".format(episode, t+1, currentScore))
-                cumulative_score += currentScore
-                if episode % average_episode_frame == 0 and episoe <= TESTING_EPISODE:
-                    experiment_results.append(cumulative_score / average_episode_frame)
+                # print('currentQuantity: ' + str(currentQuantity))
+
+                # print(episodeFrame)
+
+                experimentResults.append(currentScore)
+
+                if episodeQuantity < 100:
+                    episodeFrame.append(currentScore)
+                    episodeQuantity += 1
+
+                    experimentAverage.append(None)
+                else:
+                    episodeFrame.append(currentScore)
+                    episodeFrame.pop(0)
+
+                    experimentAverage.append(sum(episodeFrame) / 100)
                 break
 
         if episode == TESTING_EPISODE:
@@ -283,25 +286,50 @@ def main():
             print('\a')
             print('ENTERED TESTING MODE')
             print(WEIGHTS)
+            print('Final Epsilon: {}'.format(EPSILON))
             EPSILON = 0
             ALPHA = 0
 
-    return experiment_results
+    return (experimentResults, experimentAverage)
 
 data = {}
 
-for key, e in EXPERIMENTS:
-    global EPSILON, EDECAY, ALPHA, DISCOUNT, SUPERVISED_EPISODE, QVALUES, WEIGHTS
-    EPSILON = e.EP
-    EDECAY = e.ED
-    ALPHA = e.AL
-    DISCOUNT = e.DI
-    SUPERVISED_EPISODE = e.SU
+for key in EXPERIMENTS:
+    e = EXPERIMENTS[key]
+    EPSILON = e['EP']
+    EDECAY = e['ED']
+    ALPHA = e['AL']
+    DISCOUNT = e['DI']
+    SUPERVISED_EPISODE = e['SU']
     QVALUES = {}
     WEIGHTS = {}
 
-    data[key] = main()
+    er = main()
+    data[key] = er
 
-columns = ['Parameters', '500', '1000', '1500', '2000', '2500', '3000', '3500', '4000', '4500', '5000', 'Weights']
+for key in EXPERIMENTS:
+
+    results, average = data[key]
+
+    lastAverage = average[len(average)-1]
+    print('Final Testing Average: {}'.format(lastAverage))
+
+    plt.plot(list(range(len(results))), results, 'bo', markersize=3, label='Individual Episode Score')
+    plt.plot(list(range(len(average))), average, 'r-', label='Average Over 100 Episodes')
+
+    # plt.annotate('Final Testing Average: {}'.format(round(lastAverage, 2)), xy=(0,0), xytext=(TOTAL_EPISODES, -20))
+    plt.figtext(0.99, 0.01, 'Final Testing Average: {}'.format(round(lastAverage, 2)), horizontalalignment='right', style='italic')
+
+    plt.axvline(x=TESTING_EPISODE, linestyle='--', label='End of Training')
+
+    plt.title('Results of Approximate Q-Learning with Supervised Learning Every Episode \n (Training Episodes: {}, Alpha: 0.001, Discount: {}, Epsilon: {}, E-Decay: {})'.format(\
+        TESTING_EPISODE, DISCOUNT, '99.99% - 0.01%', EDECAY))
+    plt.ylabel('Score')
+    plt.xlabel('Episodes (Training: 1-{}, Testing: {}-{})'.format(TESTING_EPISODE, TESTING_EPISODE+1, TOTAL_EPISODES))
+    plt.legend()
+    plt.show()
+    plt.savefig('lunarlanderoutput.png')
+
+columns = ['Parameters', 'Weights']
 
 
