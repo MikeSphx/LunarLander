@@ -10,6 +10,10 @@ The following is required to run the environment:
 - Numpy (pip install numpy)
 - Matplotlib (pip install matplotlib)
 
+Once setup, simply run the following command on any of the files listed in the Directory:
+
+`python <file>`
+
 ## Directory
 Listed in the order in which we implemented them:
 - roundingQLearning.py : Our "rounded" Q-Learning approach
